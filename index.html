@@ -1,0 +1,318 @@
+<!-- full keyboard-scroll-test.html -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="height=device-height, width=device-width, initial-scale=1.0" />
+  <title>Keyboard Scroll Visual Test2</title>
+  <style>
+    :root {
+      --todom-sticken-yoffset: 0px;
+    }
+
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      background: #1c1c1c;
+    }
+
+    ul {
+      padding: 0;
+      margin: 0;
+    }
+
+    li {
+      list-style: none;
+      padding: 26px;
+      margin: 18px 8px;
+      background: black;
+      color: grey;
+      border-radius: 6px;
+      position: relative;
+    }
+
+    .top-in-li {
+      background-color: lightblue;
+      padding: 8px;
+      position: fixed;
+      top: 0;
+      width: 100%;
+      z-index: 5;
+      transform: translateY(var(--todom-sticken-yoffset));
+      transition: transform 0.3s ease-in-out;
+    }
+
+    textarea {
+      display: block;
+      width: 100%;
+      height: 100px;
+      margin-top: 12px;
+      font-size: 16px;
+      background: #333;
+      color: #dfdfdf;
+    }
+
+    .controls {
+      position: fixed;
+      bottom: 10px;
+      left: 10px;
+      background: rgba(0, 0, 0, 0.9);
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      z-index: 100;
+    }
+
+    .controls button {
+      margin: 2px;
+      font-size: 14px;
+      background: #6d6d6d;
+    }
+
+    .log-box {
+      position: fixed;
+      bottom: 0;
+      right: 0;
+      max-height: 160px;
+      overflow-y: auto;
+      width: 300px;
+      font-size: 12px;
+      background: rgba(0, 0, 0, 0.95);
+      color: #0f0;
+      padding: 8px;
+      font-family: monospace;
+      z-index: 200;
+      border-left: 1px solid #444;
+      border-top: 1px solid #444;
+    }
+
+    .log-box .log-entry {
+      margin-bottom: 4px;
+      white-space: pre-wrap;
+      line-height: 1.3em;
+    }
+
+    .log-box .log-key {
+      color: #f90;
+    }
+
+    .log-box .log-highlight {
+      color: #ff0;
+    }
+
+    .export-log {
+      position: fixed;
+      bottom: 180px;
+      right: 10px;
+      z-index: 300;
+      background: #444;
+      color: white;
+      padding: 6px 10px;
+      font-size: 13px;
+      border: 1px solid #888;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .export-log:nth-of-type(2) {
+      right: 160px;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 240px;
+      right: 10px;
+      background: #0f0;
+      color: black;
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-weight: bold;
+      opacity: 0;
+      transition: opacity 0.3s ease-in-out;
+      z-index: 400;
+    }
+
+    .toast.show {
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+  <div class="top-in-li sticken">🔝 Sticky Header2</div>
+
+  <ul>
+    <li>Item 1</li>
+    <li>Item 2</li>
+    <li>Item 3 <textarea placeholder="Focus me"></textarea></li>
+    <li>Item 4</li>
+    <li>Item 5</li>
+    <li>Item 6</li>
+    <li>Item 7</li>
+    <li>Item 8</li>
+    <li>Item 9</li>
+    <li>Item 10</li>
+    <li>Item 11</li>
+    <li>Item 12</li>
+    <li>Item 13</li>
+    <li>Item 14</li>
+    <li>Item 15</li>
+    <li>Item 16</li>
+    <li>Item 17</li>
+    <li>Item 18</li>
+    <li>Item 19</li>
+    <li>Item 20</li>
+  </ul>
+
+  <div class="controls">
+    <button onclick="simulateOpenKeyboard()">Simulate Open</button>
+    <button onclick="simulateCloseKeyboard()">Simulate Close</button>
+  </div>
+
+  <div class="export-log" onclick="exportLogsToFile()">📄 Export Logs</div>
+  <div class="export-log" style="right: 160px;" onclick="uploadScrollLogToLogsDir()">📤 Save to test/logs/</div>
+
+  <div class="log-box" id="logBox"></div>
+  <div id="toast" class="toast">Saved!</div>
+
+  <!-- ✅ External scroll memory logic -->
+  <script src="scroll-anchor-memory.js"></script>
+
+  <script>
+    let isKeyboardOpen = false;
+    let rawLogs = [];
+
+    function log(label) {
+      const state = {
+        scrollY: window.scrollY,
+        offsetTop: window.visualViewport?.offsetTop,
+        viewportHeight: window.visualViewport?.height,
+        keyboardOpen: isKeyboardOpen,
+      };
+      const timestamp = new Date().toLocaleTimeString();
+      const logText = `[${timestamp}] ${label}\n  scrollY=${state.scrollY}, offsetTop=${state.offsetTop}, height=${state.viewportHeight}`;
+      rawLogs.push(logText);
+
+      const logBox = document.getElementById('logBox');
+      const html = `<div class='log-entry'>
+        <span class='log-key'>[${timestamp}]</span> 
+        <span class='log-highlight'>${label}</span><br>
+        scrollY=<span>${state.scrollY}</span>, offsetTop=<span>${state.offsetTop}</span>, height=<span>${state.viewportHeight}</span>
+      </div>`;
+      logBox.insertAdjacentHTML('afterbegin', html);
+    }
+
+    function exportLogsToFile() {
+      const blob = new Blob([rawLogs.join("\n\n")], { type: "text/plain" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `keyboard-log-${Date.now()}.txt`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function showToast(msg, color = '#0f0') {
+      const toast = document.getElementById('toast');
+      toast.textContent = msg;
+      toast.style.background = color;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 1200);
+    }
+
+    function updateSticky(yOffset = 0) {
+      document.querySelector(":root").style.setProperty("--todom-sticken-yoffset", `${yOffset}px`);
+      log("apply yOffset: " + yOffset);
+    }
+
+    function handleResize() {
+      if (!window.visualViewport) return;
+      const diff = window.innerHeight - window.visualViewport.height;
+      isKeyboardOpen = diff > 150;
+      updateSticky(window.visualViewport.offsetTop);
+      log("resize event");
+    }
+
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener("resize", handleResize);
+      window.visualViewport.addEventListener("scroll", handleResize);
+    }
+
+    function simulateOpenKeyboard() {
+      updateSticky(300);
+      log("[simulate] open");
+    }
+
+    function simulateCloseKeyboard() {
+      updateSticky(0);
+      log("[simulate] close");
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      setupScrollMemory(); // ← external scroll logic
+    });
+
+    function uploadScrollLogToLogsDir() {
+      const content = rawLogs.join("\n\n");
+      const filename = `keyboard-log-${Date.now()}.txt`;
+      const path = `test/logs/${filename}`;
+      const url = `../cgi-bin/binary-file-upload.sh?${encodeURIComponent(path)}`;
+
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", url, true);
+      xhr.setRequestHeader("Content-Type", "application/octet-stream");
+
+      xhr.onload = function () {
+        const response = xhr.responseText.trim();
+        if (xhr.status >= 200 && xhr.status < 300) {
+          if (response === "EXTRA_OVERWRITE_NEEDED") {
+            if (confirm("File exists. Overwrite?")) {
+              sendExtraInfo(url, "overwrite=true");
+            } else {
+              log("[upload] ❌ Cancelled by user");
+              showToast("Cancelled", "#f00");
+            }
+          } else {
+            log("[upload] ✅ File saved as: " + filename);
+            showToast(`Saved! → /test/logs/${filename}`, "#0f0");
+            console.log(`[upload] File saved at: /test/logs/${filename}`);
+          }
+        } else {
+          log("[upload] ❌ Upload failed");
+          showToast("Failed!", "#f00");
+        }
+      };
+
+      xhr.onerror = function () {
+        log("[upload] ❌ Network error");
+        showToast("Network error!", "#f00");
+      };
+
+      xhr.send(new Blob([content], { type: "text/plain" }));
+    }
+
+    function sendExtraInfo(url, extraData) {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", `${url}&${extraData}`, true);
+      xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+
+      xhr.onload = function () {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          log("[upload] ✅ Overwrite confirmed");
+          showToast("Overwritten!", "#0f0");
+        } else {
+          log("[upload] ❌ Extra request failed");
+          showToast("Overwrite failed!", "#f00");
+        }
+      };
+
+      xhr.onerror = function () {
+        log("[upload] ❌ Network error during extra request");
+        showToast("Extra error!", "#f00");
+      };
+
+      xhr.send();
+    }
+  </script>
+</body>
+</html>
